@@ -15,6 +15,7 @@ library(writexl)
 library(utils)
 library(RSQLite) 
 library(DBI) 
+library(lubridate)
 ```
 
 Taller de programación para Análisis de Datos II
@@ -95,19 +96,51 @@ f. Haga una inspección de las variables type y country para determinar si hay o
 escritas de diferentes maneras. Si es ahí, haga la limpieza para poder homogenizar esos datos. (10pts)
 
 ```{r}
+unicos_tipos <- unique(datos_sin_columna$Tipo)
+unicos_pais <- unique(datos_sin_columna$Pais)
+print(unicos_pais)
+print(unicos_tipos)
+
+datos_sin_columna$Pais <- str_to_title(datos_sin_columna$Pais)
+datos_sin_columna$Tipo <- str_to_title(datos_sin_columna$Tipo)
+
+datos_limpios<- datos_sin_columna |> 
+  mutate(Tipo = ifelse(Tipo == "Movi", "Movie", Tipo))
 
 ```
 g. Para todas las columnas de tipo carácter, en donde haya NA, coloque “Sin información”. (4pts)
 
 
 ```{r}
+glimpse(datos_limpios)
 
+datos_limpios <- datos_limpios |> 
+  mutate_if(is.character, ~replace(., is.na(.), "Sin información"))
 ```
 h. Añada a su conjunto de datos una nueva columna llamada anyo que indique el año en que el show o
 película fue añadido a Netflix. Añada también una columna llamada mes que indique el mes en que el
 show o película fue añadido a Netflix. (6pts)
 
 ```{r}
+datos_fechas <- datos_limpios |> 
+  mutate(Fecha_añadido = case_when(
+    nchar(Fecha_añadido) == 8 ~ dmy(Fecha_añadido),
+    nchar(Fecha_añadido) == 10 ~ mdy(Fecha_añadido),
+    TRUE ~ as.Date(Fecha_añadido, format = "%d/%m/%Y")
+  ))
+
+datos_fechas <- datos_limpios |> 
+  mutate(Fecha_añadido = ifelse(is.na(Fecha_añadido), "Sin información", Fecha_añadido),
+         Fecha_añadido = parse_date_time(Fecha_añadido, c("dmY", "mdY")))
+
+
+datos_fechas <- datos_fechas |> 
+  mutate(anyo = year(Fecha_añadido))
+
+
+datos_fechas <- datos_fechas |> 
+  mutate(mes = month(Fecha_añadido, label = TRUE))
+
 
 ```
 
@@ -115,13 +148,30 @@ Una vez que haya terminado la limpieza anterior, responda las siguientes pregunt
 i. Cuántas películas y shows de TV hay por país? (4pts)
 
 ```{r}
+conteo_peliculas_tv <- datos %>%
+  group_by(Pais, Tipo) %>%
+  summarize(Count = n())
+
+
 
 ```
 j. Cuáles son los 10 directores con mayor cantidad de películas (sin contar shows de TV) en Netflix?
 Ordénelos por orden descendente. (4pts)
 
 ```{r}
+peliculas <-datos_limpios |> 
+  filter(Tipo == "Movie")
 
+
+conteo_directores <- peliculas |> 
+  group_by(Director) |> 
+  count() |> 
+  ungroup()
+
+
+directores_top_10 <- conteo_directores |> 
+  arrange(desc(n)) |> 
+  head(10)
 ```
 
 
@@ -130,11 +180,28 @@ k. Cuáles son los 10 directores con mayor cantidad de shows de TV (sin contar p
 Ordénelos por orden descendente. (4pts)
 
 ```{r}
+tv_show <-datos_limpios |> 
+  filter(Tipo == "Tv Show")
 
+
+conteo_tv <- tv_show |> 
+  group_by(Director) |> 
+  count() |> 
+  ungroup()
+
+
+dirtv_top_10 <- conteo_tv |> 
+  arrange(desc(n)) |> 
+  head(10)
 ```
 l. Obtenga la lista de películas y shows de TV que se añadieron en marzo del año 2020. Cuántos fueron?
 
 ```{r}
+marzo_2020 <- datos_fechas |> 
+  filter(month(Fecha_añadido) == 3 & year(Fecha_añadido) == 2020)
+
+cantidad_marzo_2020 <- nrow(marzo_2020)
+#89
 
 ```
 
